@@ -1,0 +1,52 @@
+HOW TO BUILD AND RUN
+====================
+
+REQUIREMENTS
+------------
+g++ compiler. if you followed setup, it is already installed.
+open a new terminal after installing so the PATH updates.
+
+
+BUILD
+-----
+open a terminal in this folder and run:
+
+    mingw32-make
+
+
+RUN
+---
+    mingw32-make run
+
+or run the binary directly:
+
+    bin\neural_network.exe
+
+
+CLEAN (delete build files and start fresh)
+-------------------------------------------
+    mingw32-make clean
+
+
+WHAT IT DOES
+------------
+trains a neural network on XOR.
+XOR means: inputs same = 0, inputs different = 1.
+
+    0 XOR 0 = 0
+    0 XOR 1 = 1
+    1 XOR 0 = 1
+    1 XOR 1 = 0
+
+the network trains for 10000 epochs and should hit 100% accuracy.
+MSE printed every 2000 epochs. lower is better. should approach 0.
+
+
+IF IT DOES NOT BUILD
+--------------------
+compiler not found:
+    winget install BrechtSanders.WinLibs.POSIX.UCRT
+    close and reopen terminal, then try again.
+
+wrong folder:
+    make sure terminal is in the Neural-Network folder, not inside src or include.
