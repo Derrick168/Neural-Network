@@ -1,12 +1,12 @@
 # Neural Network
 
-neural network written in c++ from scratch. no libraries. trains on XOR.
+neural network written in c++ from scratch with no libraries.
 
-## how to build
+## How to build
 
 see HOW_TO_RUN.txt
 
-## what it does
+## Description
 
 builds a small network with 2 inputs, 4 hidden neurons, 1 output.
 trains a neural network on XOR.
