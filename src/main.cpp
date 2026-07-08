@@ -1,93 +1,91 @@
 #include "NeuralNetwork.hpp"
 #include <iostream>
 #include <vector>
-#include <iomanip>
+#include <cstdlib>
+#include <ctime>
+
+using namespace std;
 
 int main() {
-    std::cout << "Neural Network XOR Demo" << std::endl;
-    std::cout << "======================" << std::endl;
+    srand(time(0));  // so the starting weights are different every run
 
+    cout << "Neural Network XOR Demo" << endl;
+    cout << "======================" << endl;
+
+    // 2 inputs -> 4 hidden neurons -> 1 output
     NeuralNetwork nn(0.5);
-    nn.addLayer(2, 4, ActivationType::SIGMOID);
-    nn.addLayer(4, 1, ActivationType::SIGMOID);
+    nn.addLayer(2, 4);
+    nn.addLayer(4, 1);
 
-    std::cout << "Created network with 2->4->1 structure." << std::endl;
+    cout << "Created network with 2->4->1 structure." << endl;
     nn.printArchitecture();
 
-    std::vector<std::vector<double>> inputs = {
-        {0.0, 0.0},
-        {0.0, 1.0},
-        {1.0, 0.0},
-        {1.0, 1.0}
+    // the 4 possible XOR inputs and their answers
+    vector<vector<double>> inputs = {
+        {0, 0},
+        {0, 1},
+        {1, 0},
+        {1, 1}
     };
-
-    std::vector<std::vector<double>> targets = {
-        {0.0},
-        {1.0},
-        {1.0},
-        {0.0}
+    vector<vector<double>> targets = {
+        {0},
+        {1},
+        {1},
+        {0}
     };
 
     int epochs = 10000;
-    std::cout << "Training for " << epochs << " epochs..." << std::endl;
+    cout << "Training for " << epochs << " epochs..." << endl;
 
-    for (int epoch = 0; epoch < epochs; ++epoch) {
-        for (size_t i = 0; i < inputs.size(); ++i) {
-            nn.train(inputs[i], targets[i], 1);
+    for (int epoch = 0; epoch < epochs; epoch++) {
+        for (int i = 0; i < 4; i++) {
+            nn.train(inputs[i], targets[i]);
         }
 
+        // print the error every 2000 epochs so we can see it going down
         if ((epoch + 1) % 2000 == 0) {
-            double totalError = 0.0;
-            for (size_t i = 0; i < inputs.size(); ++i) {
-                auto output = nn.predict(inputs[i]);
+            double totalError = 0;
+            for (int i = 0; i < 4; i++) {
+                vector<double> output = nn.predict(inputs[i]);
                 double diff = output[0] - targets[i][0];
                 totalError += diff * diff;
             }
-            totalError /= inputs.size();
-            std::cout << "Epoch " << (epoch + 1) << "/" << epochs
-                      << " - MSE=" << std::fixed << std::setprecision(6)
-                      << totalError << std::endl;
+            cout << "Epoch " << (epoch + 1) << "/" << epochs
+                 << " - MSE=" << totalError / 4 << endl;
         }
     }
 
-    std::cout << "Training complete." << std::endl;
-    std::cout << "\nTesting network on XOR inputs:\n" << std::endl;
-
-    std::cout << std::left
-              << std::setw(10) << "Input"
-              << std::setw(10) << "Expected"
-              << std::setw(10) << "Output" << "\n";
-    std::cout << "------------------------------\n";
+    cout << "Training complete." << endl;
+    cout << "\nTesting network on XOR inputs:" << endl;
 
     int correct = 0;
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        auto output = nn.predict(inputs[i]);
+    for (int i = 0; i < 4; i++) {
+        vector<double> output = nn.predict(inputs[i]);
         double value = output[0];
-        int predicted = value > 0.5 ? 1 : 0;
-        int expect = static_cast<int>(targets[i][0]);
 
-        if (predicted == expect) {
+        // round the output to 0 or 1
+        int predicted = 0;
+        if (value > 0.5) {
+            predicted = 1;
+        }
+
+        int expected = (int)targets[i][0];
+        if (predicted == expected) {
             correct++;
         }
 
-        std::string inputStr = std::to_string(static_cast<int>(inputs[i][0]))
-                             + " " + std::to_string(static_cast<int>(inputs[i][1]));
-        std::cout << std::left
-                  << std::setw(10) << inputStr
-                  << std::setw(10) << expect
-                  << std::fixed << std::setprecision(4) << value << "\n";
+        cout << (int)inputs[i][0] << " XOR " << (int)inputs[i][1]
+             << " -> " << value << " (expected " << expected << ")" << endl;
     }
 
-    double accuracy = (static_cast<double>(correct) / inputs.size()) * 100.0;
-    std::cout << "\nAccuracy: " << std::fixed << std::setprecision(1)
-              << accuracy << "%" << std::endl;
+    double accuracy = correct / 4.0 * 100.0;
+    cout << "\nAccuracy: " << accuracy << "%" << endl;
 
     if (accuracy >= 99.0) {
-        std::cout << "Network learned XOR strongly." << std::endl;
+        cout << "Network learned XOR strongly." << endl;
     } else {
-        std::cout << "Network did not learn XOR perfectly yet." << std::endl;
+        cout << "Network did not learn XOR perfectly yet." << endl;
     }
 
     return 0;
 }
-

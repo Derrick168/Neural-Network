@@ -1,50 +1,36 @@
-#pragma once
+#ifndef NEURALNETWORK_H
+#define NEURALNETWORK_H
 
 #include "Matrix.hpp"
 #include "Activation.hpp"
 #include <vector>
 
-// Simple neural network class. stores trains layers.
+// a simple feed forward neural network trained with backpropagation
 class NeuralNetwork {
+public:
+    NeuralNetwork(double lr);
+
+    void addLayer(int inputSize, int outputSize);
+    void train(const std::vector<double> &input, const std::vector<double> &target);
+    std::vector<double> predict(const std::vector<double> &input);
+    void printArchitecture();
+
 private:
+    // one layer of the network
     struct Layer {
         Matrix weights;
         Matrix biases;
-        Matrix inputs;
-        Matrix outputs;
-        Matrix errors;
-        ActivationType activation;
-
-        Layer(size_t inputSize, size_t outputSize, ActivationType act = ActivationType::SIGMOID);
+        Matrix input;   // input saved from the forward pass
+        Matrix output;  // output saved from the forward pass
+        Matrix error;   // how wrong each neuron was
     };
 
     std::vector<Layer> layers;
     double learningRate;
 
-public:
-    NeuralNetwork(double learningRate = 0.1);
-
-    // Add a layer: inputSize -> outputSize
-    void addLayer(size_t inputSize, size_t outputSize, ActivationType activation = ActivationType::SIGMOID);
-
-    // Predict from input values
-    std::vector<double> predict(const std::vector<double>& input);
-
-    // Train on one example for some epochs
-    void train(const std::vector<double>& input, const std::vector<double>& target, int epochs = 1);
-
-    // Get the current output from the network
-    std::vector<double> getOutput() const;
-
-    size_t getLayerCount() const { return layers.size(); }
-    double getLearningRate() const { return learningRate; }
-    void setLearningRate(double lr) { learningRate = lr; }
-
-    void printArchitecture() const;
-
-private:
-    void forward(const std::vector<double>& input);
-    void backward(const std::vector<double>& target);
+    void forward(const std::vector<double> &input);
+    void backward(const std::vector<double> &target);
     void updateWeights();
 };
 
+#endif

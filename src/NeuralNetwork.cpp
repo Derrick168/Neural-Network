@@ -1,128 +1,101 @@
 #include "NeuralNetwork.hpp"
 #include <iostream>
 
-NeuralNetwork::Layer::Layer(size_t inputSize, size_t outputSize, ActivationType act)
-    : weights(outputSize, inputSize),
-      biases(outputSize, 1),
-      inputs(inputSize, 1),
-      outputs(outputSize, 1),
-      errors(outputSize, 1),
-      activation(act) {
-    weights.randomize();
-    biases.randomize();
+using namespace std;
+
+NeuralNetwork::NeuralNetwork(double lr) {
+    learningRate = lr;
 }
 
-NeuralNetwork::NeuralNetwork(double lr) : learningRate(lr) {}
-
-void NeuralNetwork::addLayer(size_t inputSize, size_t outputSize, ActivationType activation) {
-    if (!layers.empty() && layers.back().weights.getRows() != inputSize) {
-        throw std::invalid_argument("Layer input size must match previous layer output size");
-    }
-    Layer newlayer(inputSize, outputSize, activation);
-    layers.push_back(newlayer);
+void NeuralNetwork::addLayer(int inputSize, int outputSize) {
+    Layer layer;
+    layer.weights = Matrix(outputSize, inputSize);
+    layer.biases = Matrix(outputSize, 1);
+    layer.error = Matrix(outputSize, 1);
+    layer.weights.randomize();
+    layer.biases.randomize();
+    layers.push_back(layer);
 }
 
-std::vector<double> NeuralNetwork::predict(const std::vector<double>& input) {
+void NeuralNetwork::train(const vector<double> &input, const vector<double> &target) {
     forward(input);
-    return getOutput();
+    backward(target);
+    updateWeights();
 }
 
-std::vector<double> NeuralNetwork::getOutput() const {
-    if (layers.empty()) {
-        throw std::runtime_error("Network has no layers");
+vector<double> NeuralNetwork::predict(const vector<double> &input) {
+    forward(input);
+
+    // turn the last layers output back into a normal vector
+    vector<double> result;
+    Matrix &out = layers.back().output;
+    for (int i = 0; i < out.rows; i++) {
+        result.push_back(out.data[i][0]);
     }
-    return layers.back().outputs.toVector();
+    return result;
 }
 
-void NeuralNetwork::train(const std::vector<double>& input, const std::vector<double>& target, int epochs) {
-    for (int epoch = 0; epoch < epochs; ++epoch) {
-        forward(input);
-        backward(target);
-        updateWeights();
-    }
-}
-
-void NeuralNetwork::forward(const std::vector<double>& input) {
-    if (layers.empty()) {
-        throw std::runtime_error("Network has no layers");
+void NeuralNetwork::forward(const vector<double> &input) {
+    // turn the input into a column matrix
+    Matrix current((int)input.size(), 1);
+    for (int i = 0; i < (int)input.size(); i++) {
+        current.data[i][0] = input[i];
     }
 
-    Matrix cur = Matrix::fromVector(input); //convert input vec to column matrix
-    for (size_t i = 0; i < layers.size(); ++i) {
-        Layer& layer = layers[i];
-        layer.inputs = cur; //store input for backprop later
+    for (int i = 0; i < (int)layers.size(); i++) {
+        layers[i].input = current;  // save it for backprop later
 
-        Matrix z = Matrix::multiply(layer.weights, cur); //w*x
-        z = Matrix::add(z, layer.biases); //w*x + b
-
-        for (size_t j = 0; j < z.getRows(); ++j) { //apply activation to each element
-            z.set(j, 0, activate(z.get(j, 0), layer.activation));
+        // z = weights * input, then add bias and apply sigmoid
+        Matrix z = layers[i].weights.multiply(current);
+        for (int j = 0; j < z.rows; j++) {
+            z.data[j][0] = sigmoid(z.data[j][0] + layers[i].biases.data[j][0]);
         }
-        layer.outputs = z;
-        cur = layer.outputs; //output of this layer is input to next
+
+        layers[i].output = z;
+        current = z;  // this layers output is the next layers input
     }
 }
 
-void NeuralNetwork::backward(const std::vector<double>& target) {
-    if (layers.empty()) {
-        throw std::runtime_error("Network has no layers");
+void NeuralNetwork::backward(const vector<double> &target) {
+    int last = (int)layers.size() - 1;
+
+    // output layer: error = (output - target) * sigmoid'(output)
+    for (int i = 0; i < layers[last].output.rows; i++) {
+        double out = layers[last].output.data[i][0];
+        layers[last].error.data[i][0] = (out - target[i]) * sigmoidDerivative(out);
     }
 
-    Matrix targetmat = Matrix::fromVector(target);
-    Layer& outlayer = layers.back();
+    // hidden layers: send the error backwards through the weights
+    for (int i = last - 1; i >= 0; i--) {
+        Matrix wt = layers[i + 1].weights.transpose();
+        Matrix passedBack = wt.multiply(layers[i + 1].error);
 
-    //output layer error = (output - target) * f'(output)
-    Matrix outerr = Matrix::subtract(outlayer.outputs, targetmat);
-    Matrix outderiv(outlayer.outputs.getRows(), 1);
-    for (size_t i = 0; i < outlayer.outputs.getRows(); ++i) {
-        outderiv.set(i, 0, derivative(outlayer.outputs.get(i, 0), outlayer.activation));
-    }
-    outlayer.errors = outerr.elementwiseMultiply(outderiv);
-
-    //propagate error back through hidden layers
-    for (int i = (int)layers.size() - 2; i >= 0; --i) {
-        Layer& cur = layers[i];
-        Layer& next = layers[i + 1];
-
-        Matrix wt = next.weights.transpose();
-        Matrix properr = Matrix::multiply(wt, next.errors); //w^T * next_errors
-
-        Matrix deriv(cur.outputs.getRows(), 1);
-        for (size_t j = 0; j < cur.outputs.getRows(); ++j) {
-            deriv.set(j, 0, derivative(cur.outputs.get(j, 0), cur.activation));
+        for (int j = 0; j < layers[i].output.rows; j++) {
+            double out = layers[i].output.data[j][0];
+            layers[i].error.data[j][0] = passedBack.data[j][0] * sigmoidDerivative(out);
         }
-        cur.errors = properr.elementwiseMultiply(deriv);
     }
 }
 
 void NeuralNetwork::updateWeights() {
-    for (size_t i = 0; i < layers.size(); ++i) {
-        Layer& layer = layers[i];
-        Matrix wgrad = Matrix::multiply(layer.errors, layer.inputs.transpose()); //delta * input^T
+    for (int i = 0; i < (int)layers.size(); i++) {
+        Layer &layer = layers[i];
 
-        for (size_t r = 0; r < layer.weights.getRows(); ++r) {
-            for (size_t c = 0; c < layer.weights.getCols(); ++c) {
-                double w = layer.weights.get(r, c);
-                layer.weights.set(r, c, w - learningRate * wgrad.get(r, c));
+        // move each weight a little bit against its gradient
+        for (int r = 0; r < layer.weights.rows; r++) {
+            for (int c = 0; c < layer.weights.cols; c++) {
+                layer.weights.data[r][c] -= learningRate * layer.error.data[r][0] * layer.input.data[c][0];
             }
-        }
-        for (size_t r = 0; r < layer.biases.getRows(); ++r) {
-            double b = layer.biases.get(r, 0);
-            layer.biases.set(r, 0, b - learningRate * layer.errors.get(r, 0));
+            layer.biases.data[r][0] -= learningRate * layer.error.data[r][0];
         }
     }
 }
 
-void NeuralNetwork::printArchitecture() const {
-    std::cout << "Network layers: " << layers.size() << "\n";
-    std::cout << "Learning rate: " << learningRate << "\n";
-    for (size_t i = 0; i < layers.size(); ++i) {
-        std::cout << " Layer " << i + 1 << ": "
-                  << layers[i].weights.getCols() << " -> "
-                  << layers[i].weights.getRows();
-        if (layers[i].activation == ActivationType::SIGMOID) std::cout << " (Sigmoid)";
-        if (layers[i].activation == ActivationType::RELU)    std::cout << " (ReLU)";
-        if (layers[i].activation == ActivationType::TANH)    std::cout << " (Tanh)";
-        std::cout << "\n";
+void NeuralNetwork::printArchitecture() {
+    cout << "Network layers: " << layers.size() << endl;
+    cout << "Learning rate: " << learningRate << endl;
+    for (int i = 0; i < (int)layers.size(); i++) {
+        cout << " Layer " << i + 1 << ": " << layers[i].weights.cols
+             << " -> " << layers[i].weights.rows << " (sigmoid)" << endl;
     }
 }
